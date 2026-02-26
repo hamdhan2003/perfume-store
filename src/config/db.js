@@ -10,5 +10,6 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
+console.log("MONGO_URI VALUE:", process.env.MONGO_URI);
 
 export default connectDB;
