@@ -1,13 +1,18 @@
+// src/middleware/upload.js
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary.js";
+import path from "path";
+import fs from "fs";
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "hirah-store",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
-  },
+const uploadDir = "temp";
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + path.extname(file.originalname)),
 });
 
 const upload = multer({ storage });

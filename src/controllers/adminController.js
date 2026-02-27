@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 import Product from "../models/Product.js";
 import { calculatePrices } from "../utils/priceCalculator.js";
 
-
+import cloudinary from "../utils/cloudinary.js";
+import fs from "fs";
 /* ================= GET ALL USERS ================= */
 export const getAllUsers = async (req, res) => {
   try {
@@ -107,8 +108,27 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    /* ================= IMAGES ================= */
-    const image = req.file ? req.file.path : null;
+/* ================= IMAGES ================= */
+let images = [];
+
+if (req.files && req.files.length > 0) {
+  for (const file of req.files) {
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: "products",
+    });
+
+    images.push(result.secure_url);
+
+    // delete temp file
+    fs.unlinkSync(file.path);
+  }
+}
+
+if (!images.length) {
+  return res.status(400).json({
+    message: "Product image is required"
+  });
+}
 
     if (!images.length) {
       return res.status(400).json({

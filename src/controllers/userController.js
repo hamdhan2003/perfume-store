@@ -2,7 +2,8 @@
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
-
+import cloudinary from "../utils/cloudinary.js";
+import fs from "fs";
 export const deleteMyAccount = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("+password");
@@ -264,7 +265,15 @@ export const uploadAvatarController = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.avatar = req.file.path; // Cloudinary URL    await user.save();
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: "avatars",
+    });
+    
+    user.avatar = result.secure_url;
+    
+    // delete temp file
+    fs.unlinkSync(req.file.path);
+        await user.save();
 
     res.json({
       success: true,
