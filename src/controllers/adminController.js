@@ -108,9 +108,7 @@ export const createProduct = async (req, res) => {
     }
 
     /* ================= IMAGES ================= */
-    const images = req.files
-      ? req.files.map(f => `uploads/products/${f.filename}`)
-      : [];
+    const image = req.file ? req.file.path : null;
 
     if (!images.length) {
       return res.status(400).json({

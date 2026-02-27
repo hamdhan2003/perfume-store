@@ -22,6 +22,7 @@ const generateToken = (user) => {
 
 
 /* SIGN UP */
+/* SIGN UP (OTP SAFE & STABLE) */
 export const signup = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -31,23 +32,29 @@ export const signup = async (req, res) => {
 
     let user = await User.findOne({ email });
 
-    // ✅ User exists
+    // ===============================
+    // EXISTING USER (NOT VERIFIED)
+    // ===============================
     if (user) {
-      // If verified → block
       if (user.isVerified) {
         return res.status(400).json({
           message: "User already exists. Please log in."
         });
       }
 
-      // If NOT verified → resend OTP
       const code = Math.floor(1000 + Math.random() * 9000).toString();
 
       user.verificationCode = code;
       user.verificationExpiry = Date.now() + 10 * 60 * 1000;
-
       await user.save();
-      await sendVerificationEmail(email, code);
+
+      try {
+        await sendVerificationEmail(email, code);
+      } catch {
+        return res.status(500).json({
+          message: "Failed to send verification email. Try again."
+        });
+      }
 
       return res.status(200).json({
         message: "Verification code resent",
@@ -55,14 +62,15 @@ export const signup = async (req, res) => {
       });
     }
 
-    // ✅ New user
+    // ===============================
+    // NEW USER
+    // ===============================
     const hashedPassword = await bcrypt.hash(password, 10);
     const role = email === ADMIN_EMAIL ? "admin" : "user";
     const code = Math.floor(1000 + Math.random() * 9000).toString();
 
-    await sendVerificationEmail(email, code);
-
-    await User.create({
+    // 1️⃣ Create user FIRST
+    user = await User.create({
       email,
       password: hashedPassword,
       role,
@@ -70,6 +78,18 @@ export const signup = async (req, res) => {
       verificationCode: code,
       verificationExpiry: Date.now() + 10 * 60 * 1000
     });
+
+    // 2️⃣ Send OTP email LAST
+    try {
+      await sendVerificationEmail(email, code);
+    } catch (err) {
+      // ❌ rollback user if email fails
+      await User.findByIdAndDelete(user._id);
+
+      return res.status(500).json({
+        message: "Failed to send verification email. Please try again."
+      });
+    }
 
     return res.status(200).json({
       message: "Verification code sent",

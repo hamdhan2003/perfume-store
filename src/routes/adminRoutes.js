@@ -1,9 +1,9 @@
-// ================= adminRoutes.js (FIXED & STABLE) =================
+// ================= adminRoutes.js (CLOUDINARY FIXED) =================
 import express from "express";
-import multer from "multer";
 
 import { protect } from "../middleware/authMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
+import upload from "../middleware/upload.js"; // ✅ Cloudinary
 
 import {
   getAllUsers,
@@ -15,21 +15,11 @@ import {
   toggleProductStatus,
   deleteProduct,
   uploadProductImage,
-  updateProductStock 
+  updateProductStock,
+  createUserByAdmin
 } from "../controllers/adminController.js";
 
-import { createUserByAdmin } from "../controllers/adminController.js";
-import { uploadAvatarController } from "../controllers/userController.js";
-
 const router = express.Router();
-
-/* ================= MULTER SETUP ================= */
-const upload = multer({
-  dest: "src/uploads/avatars"   // matches your existing structure
-});
-const productUpload = multer({
-  dest: "src/uploads/products"
-});
 
 /* ================= USERS ================= */
 router.get("/users", protect, adminOnly, getAllUsers);
@@ -38,10 +28,7 @@ router.post("/users", protect, adminOnly, createUserByAdmin);
 /* ================= STATS ================= */
 router.get("/stats", protect, adminOnly, getAdminStats);
 
-
-
-
-
+/* ================= PRODUCT STOCK ================= */
 router.put(
   "/products/:id/stock",
   protect,
@@ -49,20 +36,28 @@ router.put(
   updateProductStock
 );
 
-
-
 /* ================= PRODUCTS ================= */
+
+/**
+ * CREATE PRODUCT (MULTIPLE IMAGES)
+ * Frontend field name: images[]
+ */
 router.post(
   "/products",
   protect,
   adminOnly,
-  productUpload.array("images", 5),
+  upload.array("images", 5), // ✅ Cloudinary
   createProduct
 );
 
 router.get("/products", protect, adminOnly, getAllProductsAdmin);
 
-router.put("/products/:id", protect, adminOnly, updateProduct);
+router.put(
+  "/products/:id",
+  protect,
+  adminOnly,
+  updateProduct
+);
 
 router.patch(
   "/products/:id/toggle",
@@ -71,14 +66,21 @@ router.patch(
   toggleProductStatus
 );
 
-router.delete("/products/:id", protect, adminOnly, deleteProduct);
+router.delete(
+  "/products/:id",
+  protect,
+  adminOnly,
+  deleteProduct
+);
 
-/* ✅ SINGLE PRODUCT IMAGE UPLOAD (EDIT MODE) */
+/**
+ * ADD / REPLACE SINGLE PRODUCT IMAGE (EDIT MODE)
+ */
 router.post(
   "/products/:id/image",
   protect,
   adminOnly,
-  productUpload.single("image"), // ✅ IMPORTANT
+  upload.single("image"), // ✅ Cloudinary
   uploadProductImage
 );
 
