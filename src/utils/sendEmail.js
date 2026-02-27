@@ -1,29 +1,7 @@
 // src/utils/sendEmail.js
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-/**
- * ✅ SINGLE REUSABLE TRANSPORTER (VERY IMPORTANT)
- */
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Gmail App Password
-  },
-});
-
-/**
- * ✅ VERIFY TRANSPORTER ON BOOT
- * Prevents silent failures in production
- */
-transporter.verify((err, success) => {
-  if (err) {
-    console.error("❌ EMAIL TRANSPORTER ERROR:", err);
-  } else {
-    console.log("✅ EMAIL TRANSPORTER READY");
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
  * =============================
@@ -32,8 +10,8 @@ transporter.verify((err, success) => {
  */
 export const sendVerificationEmail = async (to, code) => {
   try {
-    await transporter.sendMail({
-      from: `"Hirah Attar" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: "Hirah Attar <no-reply@resend.dev>",
       to,
       subject: "Your Verification Code",
       html: `
@@ -56,8 +34,8 @@ export const sendVerificationEmail = async (to, code) => {
  */
 export const sendResetEmail = async (to, link) => {
   try {
-    await transporter.sendMail({
-      from: `"Hirah Attar" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+      from: "Hirah Attar <no-reply@resend.dev>",
       to,
       subject: "Reset Your Password",
       html: `
