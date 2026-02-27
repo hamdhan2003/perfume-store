@@ -2,7 +2,7 @@
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
-import cloudinary from "../utils/cloudinary.js";
+import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
 export const deleteMyAccount = async (req, res) => {
   try {

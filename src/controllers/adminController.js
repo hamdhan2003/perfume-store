@@ -2,7 +2,6 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import Product from "../models/Product.js";
 import { calculatePrices } from "../utils/priceCalculator.js";
-
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
 /* ================= GET ALL USERS ================= */
