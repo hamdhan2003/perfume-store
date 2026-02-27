@@ -25,23 +25,22 @@ router.post("/change-password", protect, changePassword);
 router.post("/logout-all", protect, logoutAllDevices);
 
 // 2️⃣ Google callback
+// 2️⃣ Google callback
 router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "process.env.FRONTEND_URL/index.html?error=google_failed"
+    failureRedirect: `${process.env.FRONTEND_URL}/index.html?error=google_failed`
   }),
   (req, res) => {
-    // 🔥 Issue YOUR JWT (same as normal login)
     const token = jwt.sign(
       { id: req.user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    // 🔁 Redirect back to frontend with token
     res.redirect(
-      `process.env.FRONTEND_URL/index.html?token=${token}`
+      `${process.env.FRONTEND_URL}/index.html?token=${token}`
     );
   }
 );

@@ -264,7 +264,7 @@ export const uploadAvatarController = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.avatar = `http://localhost:5000/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
+    user.avatar = `https://perfume-store-production.up.railway.app/uploads/avatars/${req.file.filename}?v=${Date.now()}`;
     await user.save();
 
     res.json({

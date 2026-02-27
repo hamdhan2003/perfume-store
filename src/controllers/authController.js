@@ -113,7 +113,7 @@ export const forgotPassword = async (req, res) => {
     await user.save();
 
     const resetLink =
-      `process.env.FRONTEND_URL/reset-password.html?token=${resetToken}`;
+      `https://perfume-store-production.up.railway.app/reset-password.html?token=${resetToken}`;
 
     // 🔥 TEMPORARY: console log (later send real email)
     await sendResetEmail(email, resetLink);
@@ -363,8 +363,11 @@ export const login = async (req, res) => {
         id: user._id,
         email: user.email,
         role: user.role,
-        avatar: user.avatar,
-      },
+        avatar: user.avatar
+        ? user.avatar.startsWith("http")
+          ? user.avatar
+          : `${process.env.BACKEND_URL}/${user.avatar}`
+        : null,      },
     });
 
   } catch (err) {
