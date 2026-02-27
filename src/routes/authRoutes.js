@@ -29,7 +29,7 @@ router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "http://127.0.0.1:5500/index.html?error=google_failed"
+    failureRedirect: "process.env.FRONTEND_URL/index.html?error=google_failed"
   }),
   (req, res) => {
     // 🔥 Issue YOUR JWT (same as normal login)
@@ -41,7 +41,7 @@ router.get(
 
     // 🔁 Redirect back to frontend with token
     res.redirect(
-      `http://127.0.0.1:5500/index.html?token=${token}`
+      `process.env.FRONTEND_URL/index.html?token=${token}`
     );
   }
 );
@@ -60,7 +60,7 @@ router.get(
   "/facebook/callback",
   passport.authenticate("facebook", {
     session: false,
-    failureRedirect: "http://127.0.0.1:5500/index.html?error=facebook_failed"
+    failureRedirect: "process.env.FRONTEND_URL/index.html?error=facebook_failed"
   }),
   (req, res) => {
     const token = jwt.sign(
@@ -70,7 +70,7 @@ router.get(
     );
 
     res.redirect(
-      `http://127.0.0.1:5500/index.html?token=${token}`
+      `process.env.FRONTEND_URL/index.html?token=${token}`
     );
   }
 );
