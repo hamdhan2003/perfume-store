@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import Product from "../models/Product.js";
 import { calculatePrices } from "../utils/priceCalculator.js";
 
-import cloudinary from "../utils/cloudinary.js";
+import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
 /* ================= GET ALL USERS ================= */
 export const getAllUsers = async (req, res) => {
