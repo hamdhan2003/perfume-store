@@ -1,52 +1,85 @@
 // src/utils/sendEmail.js
-import { Resend } from "resend";
+import fetch from "node-fetch";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const MAILERSEND_API = "https://api.mailersend.com/v1/email";
 
 /**
- * =============================
  * SEND OTP / VERIFICATION EMAIL
- * =============================
  */
 export const sendVerificationEmail = async (to, code) => {
   try {
-    await resend.emails.send({
-      from: "Hirah Attar <onboarding@resend.dev>",
-      to,
-      subject: "Your Verification Code",
-      html: `
-        <h2>Verify Your Account</h2>
-        <p>Your 4-digit verification code is:</p>
-        <h1 style="letter-spacing:4px">${code}</h1>
-        <p>This code expires in 10 minutes.</p>
-      `,
+    const response = await fetch(MAILERSEND_API, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.MAILERSEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: {
+          email: "mohamed.hamdhan0047@gmail.com", // verified sender
+          name: "Hirah Attar",
+        },
+        to: [
+          {
+            email: to,
+          },
+        ],
+        subject: "Your Verification Code",
+        html: `
+          <h2>Verify Your Account</h2>
+          <p>Your 4-digit verification code is:</p>
+          <h1>${code}</h1>
+          <p>This code expires in 10 minutes.</p>
+        `,
+      }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText);
+    }
   } catch (err) {
     console.error("❌ OTP EMAIL FAILED:", err);
-    throw new Error("OTP_EMAIL_FAILED");
+    throw err;
   }
 };
 
 /**
- * =============================
  * SEND RESET PASSWORD EMAIL
- * =============================
  */
 export const sendResetEmail = async (to, link) => {
   try {
-    await resend.emails.send({
-      from: "Hirah Attar <onboarding@resend.dev>",
-            to,
-      subject: "Reset Your Password",
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>Click the link below to reset your password:</p>
-        <a href="${link}" target="_blank">${link}</a>
-        <p>This link expires in 15 minutes.</p>
-      `,
+    const response = await fetch(MAILERSEND_API, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.MAILERSEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: {
+          email: "mohamed.hamdhan0047@gmail.com", // verified sender
+          name: "Hirah Attar",
+        },
+        to: [
+          {
+            email: to,
+          },
+        ],
+        subject: "Reset Your Password",
+        html: `
+          <h2>Password Reset</h2>
+          <p>Click the link below to reset your password:</p>
+          <a href="${link}">${link}</a>
+        `,
+      }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText);
+    }
   } catch (err) {
     console.error("❌ RESET EMAIL FAILED:", err);
-    throw new Error("RESET_EMAIL_FAILED");
+    throw err;
   }
 };
