@@ -11,7 +11,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export const sendVerificationEmail = async (to, code) => {
   try {
     await resend.emails.send({
-      from: "Hirah Attar <no-reply@resend.dev>",
+      from: "Hirah Attar <onboarding@resend.dev>",
       to,
       subject: "Your Verification Code",
       html: `
@@ -35,8 +35,8 @@ export const sendVerificationEmail = async (to, code) => {
 export const sendResetEmail = async (to, link) => {
   try {
     await resend.emails.send({
-      from: "Hirah Attar <no-reply@resend.dev>",
-      to,
+      from: "Hirah Attar <onboarding@resend.dev>",
+            to,
       subject: "Reset Your Password",
       html: `
         <h2>Password Reset Request</h2>
