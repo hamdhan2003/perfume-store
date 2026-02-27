@@ -1,6 +1,14 @@
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
+const resolveImage = (img) => {
+  if (!img) return null;
 
+  // Cloudinary or external
+  if (img.startsWith("http")) return img;
+
+  // Legacy local uploads
+  return `${process.env.BACKEND_URL}/${img}`;
+};
 /* ================= GET PUBLIC PRODUCTS ================= */
 export const getPublicProducts = async (req, res) => {
     try {
@@ -28,10 +36,16 @@ if (quality && ["normal", "original"].includes(quality)) {
   
         Product.countDocuments(query)
       ]);
-  
+      const normalizedProducts = products.map(p => ({
+        ...p.toObject(),
+        images: Array.isArray(p.images)
+          ? p.images.map(resolveImage)
+          : []
+      }));
+      
       res.json({
         success: true,
-        products,
+        products: normalizedProducts,
         total
       });
   
@@ -60,7 +74,12 @@ export const getPublicProductBySlug = async (req, res) => {
 
     res.json({
       success: true,
-      product
+      product: {
+        ...product.toObject(),
+        images: Array.isArray(product.images)
+          ? product.images.map(resolveImage)
+          : []
+      }
     });
   } catch (err) {
     console.error("GET PRODUCT BY SLUG ERROR:", err);
@@ -144,10 +163,14 @@ export const getPublicProductById = async (req, res) => {
         message: "Product not found"
       });
     }
-
     res.json({
       success: true,
-      product
+      product: {
+        ...product.toObject(),
+        images: Array.isArray(product.images)
+          ? product.images.map(resolveImage)
+          : []
+      }
     });
   } catch (err) {
     console.error("GET PRODUCT BY ID ERROR:", err);

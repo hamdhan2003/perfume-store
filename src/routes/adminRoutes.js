@@ -1,7 +1,7 @@
 // ================= adminRoutes.js (FIXED & STABLE) =================
 import express from "express";
 import multer from "multer";
-
+import cloudinary from "../config/cloudinary.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
 
