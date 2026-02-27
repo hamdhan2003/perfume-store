@@ -4,6 +4,13 @@ import Product from "../models/Product.js";
 import { calculatePrices } from "../utils/priceCalculator.js";
 import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
+
+// ADD BELOW IMPORTS (top)
+const resolveImage = (img) => {
+  if (!img) return null;
+  if (img.startsWith("http")) return img;
+  return `${process.env.BACKEND_URL}/${img}`;
+};
 /* ================= GET ALL USERS ================= */
 export const getAllUsers = async (req, res) => {
   try {
@@ -443,8 +450,10 @@ export const uploadProductImage = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // ✅ save relative path
-    const imagePath = `uploads/products/${req.file.filename}`;
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: "products"
+    });
+    fs.unlinkSync(req.file.path);
 
     // you decided: single image only
     product.images = [imagePath];
@@ -468,9 +477,12 @@ export const getAllProductsAdmin = async (req, res) => {
 
     const mapped = products.map(p => {
       const obj = p.toObject();
-
+    
       return {
         ...obj,
+        images: Array.isArray(obj.images)
+          ? obj.images.map(resolveImage)
+          : [],
         calculatedPrices: calculatePrices(obj.prices)
       };
     });
