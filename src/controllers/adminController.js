@@ -8,14 +8,8 @@ import fs from "fs";
 // ADD BELOW IMPORTS (top)
 const resolveImage = (img) => {
   if (!img) return null;
-
-  // Cloudinary or full URL
   if (img.startsWith("http")) return img;
-
-  // If backend URL is missing, DO NOT build a broken URL
-  if (!process.env.BACKEND_URL) return null;
-
-  return `${process.env.BACKEND_URL.replace(/\/$/, "")}/${img.replace(/^\//, "")}`;
+  return `${process.env.BACKEND_URL}/${img}`;
 };
 /* ================= GET ALL USERS ================= */
 export const getAllUsers = async (req, res) => {
@@ -462,7 +456,7 @@ export const uploadProductImage = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     // you decided: single image only
-product.images = [result.secure_url];
+    product.images = [imagePath];
     await product.save();
 
     res.json({
@@ -486,7 +480,9 @@ export const getAllProductsAdmin = async (req, res) => {
     
       return {
         ...obj,
-        images: Array.isArray(obj.images) ? obj.images : [],
+        images: Array.isArray(obj.images)
+          ? obj.images.map(resolveImage)
+          : [],
         calculatedPrices: calculatePrices(obj.prices)
       };
     });

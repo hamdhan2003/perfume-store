@@ -59,8 +59,7 @@ loyalty: {
     paymentStatus: {
       type: String,
       enum: ["unpaid", "paid", "refunded"],
-      default: "paid"
-    },
+      default: "unpaid"    },
 
     /* ✅ ORDER STATUS (ADMIN FLOW) */
     orderStatus: {

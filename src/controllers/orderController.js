@@ -4,7 +4,81 @@ import mongoose from "mongoose";
 import { calculateLoyaltyTier } from "../utils/loyaltyCalculator.js";
 import User from "../models/User.js";
 import { notifyOrderEvent } from "../services/notificationService.js";
+import Stripe from "stripe";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+export const createCheckoutSession = async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false });
+    }
+
+    if (order.paymentStatus === "paid") {
+      return res.json({ success: true, message: "Already paid" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "lkr",
+            product_data: {
+              name: `Order ${order._id}`
+            },
+            unit_amount: Math.round(order.total * 100)
+          },
+          quantity: 1
+        }
+      ],
+      success_url: `${process.env.FRONTEND_URL}/success.html?orderId=${order._id}`,
+      cancel_url: `${process.env.FRONTEND_URL}/checkout.html`,
+      metadata: {
+        orderId: order._id.toString()
+      }
+    });
+
+    res.json({ success: true, url: session.url });
+
+  } catch (err) {
+    console.error("STRIPE SESSION ERROR:", err);
+    res.status(500).json({ success: false });
+  }
+};
+
+export const stripeWebhook = async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("Webhook signature failed");
+    return res.status(400).send(`Webhook Error`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const orderId = session.metadata.orderId;
+
+    const order = await Order.findById(orderId);
+    if (order) {
+      order.paymentStatus = "paid";
+      await order.save();
+    }
+  }
+
+  res.json({ received: true });
+};
 
 
 /* ================= CREATE ORDER ================= */
@@ -603,8 +677,11 @@ export const payOrderUser = async (req, res) => {
     }
 
  // paymentMethod MUST already be chosen by frontend
-if (order.paymentMethod === "online") {
-  order.paymentStatus = "paid";
+ if (order.paymentMethod === "online") {
+  return res.status(400).json({
+    success: false,
+    message: "Online payment gateway not configured"
+  });
 }
 
 if (order.paymentMethod === "cash") {
