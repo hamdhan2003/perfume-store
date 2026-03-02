@@ -429,7 +429,18 @@ export const updateProductStock = async (req, res) => {
         enabled: newEnabled
       };
     });
-
+    app.get("/admin/fix-product-images", async (req, res) => {
+      const products = await Product.find();
+    
+      for (const p of products) {
+        if (Array.isArray(p.images)) {
+          p.images = p.images.filter(img => typeof img === "string" && img.startsWith("http"));
+          await p.save();
+        }
+      }
+    
+      res.send("Images fixed");
+    });
     await product.save();
 
     res.json({
