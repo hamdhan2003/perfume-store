@@ -8,8 +8,14 @@ import fs from "fs";
 // ADD BELOW IMPORTS (top)
 const resolveImage = (img) => {
   if (!img) return null;
+
+  // Cloudinary or full URL
   if (img.startsWith("http")) return img;
-  return `${process.env.BACKEND_URL}/${img}`;
+
+  // If backend URL is missing, DO NOT build a broken URL
+  if (!process.env.BACKEND_URL) return null;
+
+  return `${process.env.BACKEND_URL.replace(/\/$/, "")}/${img.replace(/^\//, "")}`;
 };
 /* ================= GET ALL USERS ================= */
 export const getAllUsers = async (req, res) => {
