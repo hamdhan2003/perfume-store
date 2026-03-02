@@ -462,8 +462,8 @@ export const uploadProductImage = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     // you decided: single image only
-    product.images = [imagePath];
-    await product.save();
+    product.images = [result.secure_url];
+        await product.save();
 
     res.json({
       success: true,
@@ -486,9 +486,7 @@ export const getAllProductsAdmin = async (req, res) => {
     
       return {
         ...obj,
-        images: Array.isArray(obj.images)
-          ? obj.images.map(resolveImage)
-          : [],
+        images: Array.isArray(obj.images) ? obj.images : [],
         calculatedPrices: calculatePrices(obj.prices)
       };
     });
