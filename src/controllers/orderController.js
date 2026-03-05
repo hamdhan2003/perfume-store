@@ -5,8 +5,14 @@ import { calculateLoyaltyTier } from "../utils/loyaltyCalculator.js";
 import User from "../models/User.js";
 import { notifyOrderEvent } from "../services/notificationService.js";
 import Stripe from "stripe";
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+let stripe = null;
+
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} else {
+  console.warn("⚠️ Stripe disabled (missing STRIPE_SECRET_KEY)");
+}
 export const createCheckoutSession = async (req, res) => {
   try {
     const { orderId } = req.body;
@@ -18,6 +24,12 @@ export const createCheckoutSession = async (req, res) => {
 
     if (order.paymentStatus === "paid") {
       return res.json({ success: true, message: "Already paid" });
+    }
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        message: "Online payment not available"
+      });
     }
 
     const session = await stripe.checkout.sessions.create({
