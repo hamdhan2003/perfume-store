@@ -1,192 +1,242 @@
 import Notification from "../models/Notification.js";
-import { sendAdminEmail, sendUserEmail } from "./emailService.js";
+import { sendAdminEmail, sendOrderEmail } from "./emailService.js";
 import { sendAdminWhatsApp } from "./whatsappService.js";
+import { sendUserSMS } from "./smsService.js";
 import AdminSettings from "../models/AdminSettings.js";
 import User from "../models/User.js";
 
-/* ===============================
-   ADMIN NOTIFICATION SETTINGS
-================================ */
-async function getAdminNotificationSettings() {
-  const settings = await AdminSettings.findOne();
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://perfume-store-frontend-ruby.vercel.app";
 
-  // fallback safety (should rarely happen)
+async function getAdminNotificationSettings() {
   return (
-    settings || {
+    (await AdminSettings.findOne()) || {
       notificationEmail: "admin@example.com",
       whatsappNumber: "",
-      smsNumber: "",
-      channels: {
-        email: true,
-        whatsapp: true,
-        sms: false
-      }
+      channels: { email: true, whatsapp: true },
     }
   );
 }
 
-/* ===============================
-   MAIN NOTIFICATION HANDLER
-================================ */
+// ── Helper: get user email from order (safe, even if unpopulated) ──────────
+async function getOrderUserEmail(order) {
+  if (order.user) {
+    const u = typeof order.user === "object" && order.user.email
+      ? order.user
+      : await User.findById(order.user).lean();
+    return u?.email || null;
+  }
+  return null;
+}
+
+// ── Helper: build order short ID ──────────────────────────────────────────
+function shortId(order) {
+  return `#ORD-${order._id.toString().slice(-6).toUpperCase()}`;
+}
+
+// ── Helper: build item description lines ─────────────────────────────────
+function itemLines(order) {
+  return order.items
+    .map(i => `  - ${i.name} x${i.qty} @ LKR ${i.unitPrice}`)
+    .join("\n");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 export async function notifyOrderEvent(event, order, actor) {
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const adminSettings = await getAdminNotificationSettings();
+  const oid = shortId(order);
+  const trackingLink = `${FRONTEND_URL}/profile.html`;
+
   const displayPaymentStatus =
-  order.paymentMethod === "online"
-    ? "paid"
-    : order.paymentStatus;
-  /* ===============================
-     LOAD FULL USER (FOR EMAIL)
-     FIXES: "USER EMAIL SKIPPED"
-  ================================ */
-  const fullUser =
-    order.user && typeof order.user === "object" && order.user.email
-      ? order.user
-      : await User.findById(order.user).lean();
+    order.paymentMethod === "online" ? "paid" : order.paymentStatus;
 
-
-
-      function orderCode(order) {
-        return `#ORD-${order._id.toString().slice(-6)}`;
-      }
-  /* ================= ORDER PLACED ================= */
+  // ─────────────────────────────────────────────────────────────────────────
   if (event === "ORDER_PLACED") {
-    const adminMsg = `
-    Order: #ORD-${order._id.toString().slice(-6)}
-    Customer: ${order.customer.name}
-    Payment: ${order.paymentMethod} (${displayPaymentStatus})
-    `;
+    const adminMsg = `New Order ${oid}\nCustomer: ${order.customer.name}\nPhone: ${order.customer.phone}\nPayment: ${order.paymentMethod} (${displayPaymentStatus})\nItems:\n${itemLines(order)}\nTotal: LKR ${order.total}`;
+
+    // In-app notifications
     await Notification.create({
       recipientType: "user",
       recipientId: order.user,
       event,
       title: "Order Placed",
-      message: `You placed a new order ${orderCode(order)}.`,
+      message: `You placed a new order ${oid}.`,
       orderId: order._id,
-      expiresAt
+      expiresAt,
     });
+
     await Notification.create({
       recipientType: "admin",
       event,
       title: "New Order Placed",
       message: adminMsg,
       orderId: order._id,
-      expiresAt
+      expiresAt,
     });
 
-    if (adminSettings.channels.email && adminSettings.notificationEmail) {
+    // Admin email/whatsapp
+    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
       await sendAdminEmail(
         adminSettings.notificationEmail,
-        "New Order Placed",
+        `New Order ${oid}`,
         adminMsg
       );
     }
 
-    if (adminSettings.channels.whatsapp && adminSettings.whatsappNumber) {
-      await sendAdminWhatsApp(
-        `To: ${adminSettings.whatsappNumber}\n${adminMsg}`
-      );
+    if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
+      await sendAdminWhatsApp(adminMsg);
     }
 
-    await sendUserEmail(
-      fullUser,
-      "Order Confirmation",
-      `Your order #ORD-${order._id.toString().slice(-6)} has been placed.`
-    );
+    // Customer email – order confirmation
+    const userEmail = await getOrderUserEmail(order);
+    if (userEmail) {
+      await sendOrderEmail(userEmail, `Order Confirmed – ${oid}`, {
+        orderId: order._id.toString(),
+        orderShortId: oid,
+        items: order.items,
+        total: order.total,
+        status: "confirmed",
+        trackingLink,
+      });
+    }
+
+    // Customer SMS
+    if (order.customer?.phone) {
+      await sendUserSMS(
+        order.customer.phone,
+        `Hi ${order.customer.name.split(" ")[0]}, your order ${oid} has been placed successfully. Total: LKR ${order.total}. Track at: ${trackingLink}`
+      );
+    }
   }
 
-  /* ================= CONFIRMED / SHIPPED ================= */
-  if (["ORDER_CONFIRMED", "ORDER_SHIPPED"].includes(event)) {
-    const status = event.split("_")[1].toLowerCase();
+  // ─────────────────────────────────────────────────────────────────────────
+  if (event === "ORDER_CONFIRMED") {
     await Notification.create({
       recipientType: "user",
       recipientId: order.user,
       event,
-      title: "Order Update",
-      message: `Your order ${orderCode(order)} has been ${status}.`,
+      title: "Order Confirmed",
+      message: `Your order ${oid} has been confirmed.`,
       orderId: order._id,
-      expiresAt
+      expiresAt,
     });
-    await sendUserEmail(
-      fullUser,
-      `Order ${status}`,
-      `Your order #ORD-${order._id.toString().slice(-6)} has been ${status}.`
-    );
-
- 
   }
 
-  /* ================= DELIVERED ================= */
-  if (event === "ORDER_DELIVERED") {
-    if (actor === "user") {
+  // ─────────────────────────────────────────────────────────────────────────
+  if (event === "ORDER_SHIPPED") {
+    await Notification.create({
+      recipientType: "user",
+      recipientId: order.user,
+      event,
+      title: "Order Shipped",
+      message: `Your order ${oid} has been shipped and is on its way!`,
+      orderId: order._id,
+      expiresAt,
+    });
 
+    // Customer email
+    const userEmail = await getOrderUserEmail(order);
+    if (userEmail) {
+      await sendOrderEmail(userEmail, `Your Order Has Been Shipped – ${oid}`, {
+        orderId: order._id.toString(),
+        orderShortId: oid,
+        items: order.items,
+        total: order.total,
+        status: "shipped",
+        trackingLink,
+      });
+    }
+
+    // Customer SMS
+    if (order.customer?.phone) {
+      await sendUserSMS(
+        order.customer.phone,
+        `Your order ${oid} has been shipped! Track your order at: ${trackingLink}`
+      );
+    }
+
+    // Admin whatsapp (optional)
+    if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
+      await sendAdminWhatsApp(`Order ${oid} has been shipped.`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  if (event === "ORDER_DELIVERED") {
+    if (actor === "user" || actor === "admin") {
+      // User in-app notification
       await Notification.create({
         recipientType: "user",
         recipientId: order.user,
         event,
         title: "Order Delivered",
-        message: `Your order ${orderCode(order)} has been delivered.`,
+        message: `Your order ${oid} has been delivered. Thank you for shopping with us!`,
         orderId: order._id,
-        expiresAt
+        expiresAt,
       });
 
-      const msg = `
-Order Received by Customer
-Order: #ORD-${order._id.toString().slice(-6)}
-Customer: ${order.customer.name}
-`;
+      const actorLabel = actor === "admin" ? "Marked Delivered by Admin" : "Received by Customer";
+      const adminMsg = `Order ${actorLabel}\nOrder: ${oid}\nCustomer: ${order.customer.name}`;
 
       await Notification.create({
         recipientType: "admin",
         event,
         title: "Order Received",
-        message: msg,
+        message: adminMsg,
         orderId: order._id,
-        expiresAt
+        expiresAt,
       });
 
-      if (adminSettings.channels.email && adminSettings.notificationEmail) {
+      // Admin email/whatsapp
+      if (adminSettings.channels?.email && adminSettings.notificationEmail) {
         await sendAdminEmail(
           adminSettings.notificationEmail,
-          "Order Received",
-          msg
+          `Order ${actorLabel}`,
+          adminMsg
         );
       }
 
-      if (adminSettings.channels.whatsapp && adminSettings.whatsappNumber) {
-        await sendAdminWhatsApp(
-          `To: ${adminSettings.whatsappNumber}\n${msg}`
+      if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
+        await sendAdminWhatsApp(adminMsg);
+      }
+
+      // Customer email
+      const userEmail = await getOrderUserEmail(order);
+      if (userEmail) {
+        await sendOrderEmail(userEmail, `Order Delivered – ${oid}`, {
+          orderId: order._id.toString(),
+          orderShortId: oid,
+          items: order.items,
+          total: order.total,
+          status: "delivered",
+          trackingLink: null,
+        });
+      }
+
+      // Customer SMS
+      if (order.customer?.phone) {
+        await sendUserSMS(
+          order.customer.phone,
+          `Your order ${oid} has been delivered. Thank you for choosing Hirah Attar!`
         );
       }
-    } else {
-      await sendUserEmail(
-        fullUser,
-        "Order Delivered",
-        `Your order #ORD-${order._id.toString().slice(-6)} has been delivered.`
-      );
-
-  
     }
   }
 
-  /* ================= CANCELLED ================= */
+  // ─────────────────────────────────────────────────────────────────────────
   if (event === "ORDER_CANCELLED") {
     if (actor === "user") {
-
       await Notification.create({
         recipientType: "user",
         recipientId: order.user,
         event,
         title: "Order Cancelled",
-        message: `Your order ${orderCode(order)} has been cancelled by admin.`,
+        message: `Your order ${oid} has been cancelled.`,
         orderId: order._id,
-        expiresAt
+        expiresAt,
       });
-      const msg = `
-Order Cancelled by User
-Order: #ORD-${order._id.toString().slice(-6)}
-Customer: ${order.customer.name}
-`;
+
+      const msg = `Order Cancelled by User\nOrder: ${oid}\nCustomer: ${order.customer.name}`;
 
       await Notification.create({
         recipientType: "admin",
@@ -194,51 +244,43 @@ Customer: ${order.customer.name}
         title: "Order Cancelled",
         message: msg,
         orderId: order._id,
-        expiresAt
+        expiresAt,
       });
 
-      if (adminSettings.channels.email && adminSettings.notificationEmail) {
-        await sendAdminEmail(
-          adminSettings.notificationEmail,
-          "Order Cancelled",
-          msg
-        );
+      if (adminSettings.channels?.email && adminSettings.notificationEmail) {
+        await sendAdminEmail(adminSettings.notificationEmail, "Order Cancelled by User", msg);
       }
 
-      if (adminSettings.channels.whatsapp && adminSettings.whatsappNumber) {
-        await sendAdminWhatsApp(
-          `To: ${adminSettings.whatsappNumber}\n${msg}`
-        );
+      if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
+        await sendAdminWhatsApp(msg);
       }
     } else {
-      await sendUserEmail(
-        fullUser,
-        "Order Cancelled",
-        `Your order #ORD-${order._id.toString().slice(-6)} has been cancelled.`
-      );
+      // Admin cancelled → notify user
+      const fullUser =
+        order.user && typeof order.user === "object" && order.user.email
+          ? order.user
+          : await User.findById(order.user).lean();
 
-     
+      if (fullUser?.email) {
+        await sendAdminEmail(
+          fullUser.email,
+          `Your order ${oid} has been cancelled`,
+          `Dear ${order.customer.name},\n\nYour order ${oid} has been cancelled by admin.\n\nIf you have any questions, please contact us.\n\nHirah Attar`
+        );
+      }
     }
   }
 
-  /* ================= RETURNED ================= */
+  // ─────────────────────────────────────────────────────────────────────────
   if (event === "ORDER_RETURNED") {
-
     await Notification.create({
       recipientType: "user",
       recipientId: order.user,
       event,
       title: "Order Returned",
-      message: `Your order ${orderCode(order)} has been returned.`,
+      message: `Your order ${oid} has been returned.`,
       orderId: order._id,
-      expiresAt
+      expiresAt,
     });
-    await sendUserEmail(
-      fullUser,
-      "Order Returned",
-      `Your order #ORD-${order._id.toString().slice(-6)} has been returned. If payment was made online, it has been refunded or is being processed.`
-    );
-
-    
   }
 }
