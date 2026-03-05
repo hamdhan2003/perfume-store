@@ -1,10 +1,21 @@
 import express from "express";
 import {
-  createOrder, getAllOrdersAdmin,
-  confirmOrderAdmin, returnOrderAdmin,
-  shipOrderAdmin, updateOrderPaymentMethod,
-  cancelOrderAdmin, getOrderByIdUser,
-  getOrderByIdAdmin, createOrderAdmin, payOrderUser, getMyOrders, markOrderReceived, cancelOrderUser
+  createOrder,
+  getAllOrdersAdmin,
+  confirmOrderAdmin,
+  returnOrderAdmin,
+  shipOrderAdmin,
+  updateOrderPaymentMethod,
+  cancelOrderAdmin,
+  getOrderByIdUser,
+  getOrderByIdAdmin,
+  createOrderAdmin,
+  payOrderUser,
+  getMyOrders,
+  markOrderReceived,
+  cancelOrderUser,
+  createCheckoutSession,
+  stripeWebhook
 } from "../controllers/orderController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
@@ -13,6 +24,10 @@ const router = express.Router();
 
 /* PUBLIC — checkout */
 router.post("/", protect, createOrder);
+/* STRIPE */
+router.post("/create-checkout-session", protect, createCheckoutSession);
+
+
 /* ADMIN */
 router.get("/admin/orders", protect, adminOnly, getAllOrdersAdmin);
 router.put("/admin/orders/:id/confirm", protect, adminOnly, confirmOrderAdmin);

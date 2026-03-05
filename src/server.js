@@ -15,7 +15,7 @@ import orderRoutes from "./routes/orderRoutes.js";
 import blogRoutes from "./routes/blogRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import adminSettingsRoutes from "./routes/adminSettingsRoutes.js";
-
+import { stripeWebhook } from "./controllers/orderController.js";
 
 dotenv.config();
 connectDB();
@@ -37,6 +37,12 @@ app.use("/api/admin", (req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+app.post(
+  "/api/orders/stripe-webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook
+);
+
 app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
