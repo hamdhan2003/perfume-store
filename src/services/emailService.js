@@ -2,11 +2,11 @@
 import fetch from "node-fetch";
 // ===============================
 
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const EMAIL_FROM = process.env.EMAIL_FROM || "noreply@hirattar.com";
-
 async function sendBrevoEmail(to, subject, html) {
   try {
+    const BREVO_API_KEY = process.env.BREVO_API_KEY;
+    const EMAIL_FROM = process.env.EMAIL_FROM || "noreply@hirattar.com";
+
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
