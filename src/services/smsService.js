@@ -6,6 +6,10 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_SENDER = process.env.BREVO_SENDER || "HirahAttar";
 
 export async function sendUserSMS(phone, message) {
+  // 🔇 SMS DISABLED — only email notifications are active
+  console.log("📱 SMS DISABLED — skipping");
+  return;
+
   if (!phone) {
     console.log("📱 SMS SKIPPED (no phone)");
     return;

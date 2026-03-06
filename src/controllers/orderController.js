@@ -165,8 +165,8 @@ export const createOrder = async (req, res) => {
         req.body.paymentMethod === "cash"
           ? "cash"
           : req.body.paymentMethod === "online"
-          ? "online"
-          : null,
+            ? "online"
+            : null,
 
       items: items.map(i => ({
         productId: i.productId,
@@ -200,7 +200,7 @@ export const createOrder = async (req, res) => {
     // 🔔 NOTIFICATION (SAFE ADDITION)
     // User placed order → notify admin (in-app + email + WhatsApp) & user (email)
     notifyOrderEvent("ORDER_PLACED", order, "user")
-    .catch(err => console.error("NOTIFICATION ERROR:", err));
+      .catch(err => console.error("NOTIFICATION ERROR:", err));
     res.status(201).json({
       success: true,
       orderId: order._id
@@ -274,8 +274,8 @@ export const updateOrderPaymentMethod = async (req, res) => {
 export const getAllOrdersAdmin = async (req, res) => {
   try {
     const orders = await Order.find()
-    .populate("user", "name email avatar")
-    .sort({ createdAt: -1 })
+      .populate("user", "name email avatar")
+      .sort({ createdAt: -1 })
       .lean();
 
     const tableOrders = orders.map(o => ({
@@ -292,7 +292,7 @@ export const getAllOrdersAdmin = async (req, res) => {
         email: o.user?.email || null,
         avatar: o.user?.avatar || null
       }
-      
+
     }));
 
     res.json({ success: true, orders: tableOrders });
@@ -311,10 +311,10 @@ export const getAllOrdersAdmin = async (req, res) => {
 export const getOrderByIdAdmin = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-    .populate("user", "name email avatar")
-    .populate("items.productId", "name")
-    .lean();
-  
+      .populate("user", "name email avatar")
+      .populate("items.productId", "name")
+      .lean();
+
 
     if (!order) {
       return res.status(404).json({
@@ -331,32 +331,32 @@ export const getOrderByIdAdmin = async (req, res) => {
       orderStatus: order.orderStatus,
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
-      
+
       subtotal: order.subtotal,
       deliveryCharge: order.deliveryCharge,
       total: order.total,
       loyalty: order.loyalty
-      ? {
+        ? {
           tier: order.loyalty.tier,
           discount: order.loyalty.discount
         }
-      : null,
+        : null,
       customer: {
         name: order.customer?.name || "-",
         phone: order.customer?.phone || "-",
         address: order.customer?.address || "-",
-        district: order.customer?.district || "-",  
+        district: order.customer?.district || "-",
         province: order.customer?.province || "-",
         city: order.customer?.city || "-",    // ✅ ADD
         postalCode: order.customer?.postalCode || "-",  // ✅ ADD
         email: order.user?.email || null,
-        accountName: order.user?.name || null ,  // optional, for admin UI later
+        accountName: order.user?.name || null,  // optional, for admin UI later
         avatar: order.user?.avatar || null   // ✅ ADD THIS
 
       },
-      
 
-     
+
+
 
       items: order.items.map(i => ({
         name: i.name,
@@ -423,8 +423,8 @@ export const confirmOrderAdmin = async (req, res) => {
 
     order.orderStatus = "confirmed";
     await order.save();
-// 🔔 NOTIFICATION: ADMIN CONFIRMED ORDER
-await notifyOrderEvent("ORDER_CONFIRMED", order, "admin");
+    // 🔔 NOTIFICATION: ADMIN CONFIRMED ORDER
+    await notifyOrderEvent("ORDER_CONFIRMED", order, "admin");
 
     res.json({ success: true });
   } catch (err) {
@@ -447,8 +447,8 @@ export const shipOrderAdmin = async (req, res) => {
 
     order.orderStatus = "shipped";
     await order.save();
-// 🔔 NOTIFICATION: ADMIN SHIPPED ORDER
-await notifyOrderEvent("ORDER_SHIPPED", order, "admin");
+    // 🔔 NOTIFICATION: ADMIN SHIPPED ORDER
+    await notifyOrderEvent("ORDER_SHIPPED", order, "admin");
     res.json({ success: true });
   } catch (err) {
     console.error("ADMIN SHIP ORDER ERROR:", err);
@@ -547,19 +547,8 @@ export const getOrderByIdUser = async (req, res) => {
         Array.isArray(item.productId.images) &&
         item.productId.images.length > 0
       ) {
+        // Images are stored as full Cloudinary URLs — use as-is
         image = item.productId.images[0];
-
-        // 🔥 ABSOLUTE URL (FINAL FIX)
-        if (!image.startsWith("http")) {
-// always return RELATIVE path (same as cart flow)
-if (image.startsWith("http")) {
-  image = image.replace(/^https?:\/\/[^/]+\/?/i, "");
-}
-
-if (image.startsWith("/")) {
-  image = image.slice(1);
-}
-        }
       }
 
       return {
@@ -632,30 +621,30 @@ export const createOrderAdmin = async (req, res) => {
       user: null,                 // 🔥 MANUAL ORDER = NO USER
       source: "admin",            // 🔥 ADMIN ORDER
       paymentMethod: "manual",
-    
+
       items: normalizedItems,
       subtotal,
       shipping,
       taxes,
       total,
-    
+
       customer: {
         name: customer.name,
         phone: customer.phone,
         address: customer.address
       },
-    
+
       delivery: {
         speed: "standard",
         days: 3,
         charge: 0
       },
-    
+
       paymentStatus: "paid",      // manual orders are paid
       orderStatus: "pending",
       notes: notes || ""
     });
-    
+
 
     res.status(201).json({
       success: true,
@@ -688,19 +677,19 @@ export const payOrderUser = async (req, res) => {
       return res.json({ success: true, message: "Already paid" });
     }
 
- // paymentMethod MUST already be chosen by frontend
- if (order.paymentMethod === "online") {
-  return res.status(400).json({
-    success: false,
-    message: "Online payment gateway not configured"
-  });
-}
+    // paymentMethod MUST already be chosen by frontend
+    if (order.paymentMethod === "online") {
+      return res.status(400).json({
+        success: false,
+        message: "Online payment gateway not configured"
+      });
+    }
 
-if (order.paymentMethod === "cash") {
-  order.paymentStatus = "unpaid"; // COD is unpaid until delivery
-}
+    if (order.paymentMethod === "cash") {
+      order.paymentStatus = "unpaid"; // COD is unpaid until delivery
+    }
 
-await order.save();
+    await order.save();
 
 
     res.json({ success: true });
@@ -878,18 +867,18 @@ export const cancelOrderUser = async (req, res) => {
     for (const item of order.items) {
       const product = await Product.findById(item.productId);
       if (!product) continue;
-    
+
       const sizeMl = Number(item.size.replace("ml", ""));
       const bottle = product.bottleSizes.find(b => b.sizeMl === sizeMl);
-    
+
       if (bottle) {
         bottle.stock += item.qty;
         product.inventoryQty += item.qty;
       }
-    
+
       await product.save();
     }
-    
+
     // ===============================
     // FAKE REFUND
     // ===============================
@@ -902,8 +891,8 @@ export const cancelOrderUser = async (req, res) => {
 
     order.orderStatus = "cancelled";
     await order.save();
-// 🔔 NOTIFICATION: USER CANCELLED ORDER
-await notifyOrderEvent("ORDER_CANCELLED", order, "user");
+    // 🔔 NOTIFICATION: USER CANCELLED ORDER
+    await notifyOrderEvent("ORDER_CANCELLED", order, "user");
     res.json({ success: true });
 
   } catch (err) {
@@ -954,8 +943,8 @@ export const returnOrderAdmin = async (req, res) => {
 
     order.orderStatus = "returned";
     await order.save();
-// 🔔 NOTIFICATION: ADMIN RETURNED ORDER
-await notifyOrderEvent("ORDER_RETURNED", order, "admin");
+    // 🔔 NOTIFICATION: ADMIN RETURNED ORDER
+    await notifyOrderEvent("ORDER_RETURNED", order, "admin");
     res.json({ success: true });
 
   } catch (err) {

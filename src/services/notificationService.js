@@ -120,6 +120,28 @@ export async function notifyOrderEvent(event, order, actor) {
       orderId: order._id,
       expiresAt,
     });
+
+    // Admin email
+    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
+      await sendAdminEmail(
+        adminSettings.notificationEmail,
+        `Order Confirmed – ${oid}`,
+        `Order ${oid} has been confirmed.\nCustomer: ${order.customer.name}`
+      );
+    }
+
+    // Customer email
+    const userEmail = await getOrderUserEmail(order);
+    if (userEmail) {
+      await sendOrderEmail(userEmail, `Order Confirmed – ${oid}`, {
+        orderId: order._id.toString(),
+        orderShortId: oid,
+        items: order.items,
+        total: order.total,
+        status: "confirmed",
+        trackingLink,
+      });
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -282,5 +304,38 @@ export async function notifyOrderEvent(event, order, actor) {
       orderId: order._id,
       expiresAt,
     });
+
+    const returnMsg = `Order Returned\nOrder: ${oid}\nCustomer: ${order.customer.name}`;
+
+    await Notification.create({
+      recipientType: "admin",
+      event,
+      title: "Order Returned",
+      message: returnMsg,
+      orderId: order._id,
+      expiresAt,
+    });
+
+    // Admin email
+    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
+      await sendAdminEmail(
+        adminSettings.notificationEmail,
+        `Order Returned – ${oid}`,
+        returnMsg
+      );
+    }
+
+    // Customer email
+    const userEmail = await getOrderUserEmail(order);
+    if (userEmail) {
+      await sendOrderEmail(userEmail, `Order Returned – ${oid}`, {
+        orderId: order._id.toString(),
+        orderShortId: oid,
+        items: order.items,
+        total: order.total,
+        status: "returned",
+        trackingLink: null,
+      });
+    }
   }
 }

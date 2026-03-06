@@ -18,18 +18,18 @@ export const getAllUsers = async (req, res) => {
     const users = await User.find().select(
       "-password -resetPasswordToken -resetPasswordExpires"
     );
-    
+
 
     const formattedUsers = users.map(user => {
       const u = user.toObject();
-    
+
       let computedStatus = "active";
       if (u.status === "suspended") computedStatus = "suspended";
       else if (u.isVerified === false) computedStatus = "pending";
-    
+
       return {
         ...u,
-    
+
         // 🔑 normalize profile details for admin
         profileDetails: {
           province: u.profileDetails?.province || "",
@@ -37,11 +37,11 @@ export const getAllUsers = async (req, res) => {
           city: u.profileDetails?.city || "",
           postalCode: u.profileDetails?.postalCode || ""
         },
-    
+
         computedStatus
       };
     });
-    
+
 
     res.json({
       success: true,
@@ -114,27 +114,27 @@ export const createProduct = async (req, res) => {
       });
     }
 
-/* ================= IMAGES ================= */
-let images = [];
+    /* ================= IMAGES ================= */
+    let images = [];
 
-if (req.files && req.files.length > 0) {
-  for (const file of req.files) {
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: "products",
-    });
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const result = await cloudinary.uploader.upload(file.path, {
+          folder: "products",
+        });
 
-    images.push(result.secure_url);
+        images.push(result.secure_url);
 
-    // delete temp file
-    fs.unlinkSync(file.path);
-  }
-}
+        // delete temp file
+        fs.unlinkSync(file.path);
+      }
+    }
 
-if (!images.length) {
-  return res.status(400).json({
-    message: "Product image is required"
-  });
-}
+    if (!images.length) {
+      return res.status(400).json({
+        message: "Product image is required"
+      });
+    }
 
     if (!images.length) {
       return res.status(400).json({
@@ -173,37 +173,37 @@ if (!images.length) {
     } catch {
       parsedVariantsRaw = [];
     }
-    
+
     const parsedVariants = Array.isArray(parsedVariantsRaw)
       ? parsedVariantsRaw
-          .filter(v => typeof v === "string")
-          .map((v, i) => {
-            let cleaned = v.trim().replace(/\s+/g, " ");
-            if (i === 0) {
-              cleaned = cleaned
-                .toLowerCase()
-                .replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
-            }
-            return cleaned;
-          })
-                    .filter(Boolean)
-          .slice(0, 5) // ✅ MAX 5
+        .filter(v => typeof v === "string")
+        .map((v, i) => {
+          let cleaned = v.trim().replace(/\s+/g, " ");
+          if (i === 0) {
+            cleaned = cleaned
+              .toLowerCase()
+              .replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1));
+          }
+          return cleaned;
+        })
+        .filter(Boolean)
+        .slice(0, 5) // ✅ MAX 5
       : [];
-    
-  const parsedNotes =
-    typeof notes === "string"
-      ? JSON.parse(notes)
-      : notes ?? { top: [], heart: [], base: [] };
-  
-  const parsedAttributes =
-    typeof attributes === "string"
-      ? JSON.parse(attributes)
-      : attributes ?? {
+
+    const parsedNotes =
+      typeof notes === "string"
+        ? JSON.parse(notes)
+        : notes ?? { top: [], heart: [], base: [] };
+
+    const parsedAttributes =
+      typeof attributes === "string"
+        ? JSON.parse(attributes)
+        : attributes ?? {
           longLasting: false,
           alcoholFree: false,
           pureAttar: false
         };
-  
+
     /* ================= CREATE PRODUCT ================= */
     const product = await Product.create({
       name,
@@ -232,13 +232,13 @@ if (!images.length) {
         heart: parsedNotes.heart ?? [],
         base: parsedNotes.base ?? []
       },
-      
+
       attributes: {
         longLasting: !!parsedAttributes.longLasting,
         alcoholFree: !!parsedAttributes.alcoholFree,
         pureAttar: !!parsedAttributes.pureAttar
       },
-      
+
       inventoryQty: initialStock,
 
       /* ✅ INITIAL STOCK PER SIZE (SYNCED) */
@@ -279,11 +279,11 @@ export const updateProduct = async (req, res) => {
 
     if (req.body.description !== undefined)
       updatePayload.description = req.body.description;
-    
-    
+
+
     if (req.body.fragranceVariants !== undefined) {
       let raw;
-    
+
       try {
         raw =
           typeof req.body.fragranceVariants === "string"
@@ -292,64 +292,64 @@ export const updateProduct = async (req, res) => {
       } catch {
         raw = [];
       }
-    
+
       updatePayload.fragranceVariants = Array.isArray(raw)
         ? raw
-            .filter(v => typeof v === "string")
-            .map(v => v.trim())
-            .filter(Boolean)
-            .slice(0, 5) // ✅ MAX 5
+          .filter(v => typeof v === "string")
+          .map(v => v.trim())
+          .filter(Boolean)
+          .slice(0, 5) // ✅ MAX 5
         : [];
     }
-    
-    
+
+
     if (req.body.notes !== undefined) {
       const parsedNotes =
         typeof req.body.notes === "string"
           ? JSON.parse(req.body.notes)
           : req.body.notes;
-    
+
       updatePayload.notes = {
         top: parsedNotes.top ?? [],
         heart: parsedNotes.heart ?? [],
         base: parsedNotes.base ?? []
       };
     }
-    
+
     if (req.body.attributes !== undefined) {
       const parsedAttributes =
         typeof req.body.attributes === "string"
           ? JSON.parse(req.body.attributes)
           : req.body.attributes;
-    
+
       updatePayload.attributes = {
         longLasting: !!parsedAttributes.longLasting,
         alcoholFree: !!parsedAttributes.alcoholFree,
         pureAttar: !!parsedAttributes.pureAttar
       };
     }
-    
+
     if (req.body.inventoryQty !== undefined)
       updatePayload.inventoryQty = Number(req.body.inventoryQty);
 
-   // IMPORTANT: prices must be fully replaced if sent
-if (req.body.prices !== undefined) {
-  updatePayload.prices = {
-    base6ml: Number(req.body.prices.base6ml),
-    sizePercentages: {
-      size3: Number(req.body.prices.sizePercentages?.size3 ?? -30),
-      size12: Number(req.body.prices.sizePercentages?.size12 ?? 35)
-    },
-    discountPercentages: {
-      base: req.body.prices.discountPercentages?.base ?? null,
-      size3: req.body.prices.discountPercentages?.size3 ?? null,
-      size12: req.body.prices.discountPercentages?.size12 ?? null
+    // IMPORTANT: prices must be fully replaced if sent
+    if (req.body.prices !== undefined) {
+      updatePayload.prices = {
+        base6ml: Number(req.body.prices.base6ml),
+        sizePercentages: {
+          size3: Number(req.body.prices.sizePercentages?.size3 ?? -30),
+          size12: Number(req.body.prices.sizePercentages?.size12 ?? 35)
+        },
+        discountPercentages: {
+          base: req.body.prices.discountPercentages?.base ?? null,
+          size3: req.body.prices.discountPercentages?.size3 ?? null,
+          size12: req.body.prices.discountPercentages?.size12 ?? null
+        }
+      };
     }
-  };
-}
 
-    
-    
+
+
 
     if (req.body.active !== undefined)
       updatePayload.active = req.body.active;
@@ -456,7 +456,7 @@ export const uploadProductImage = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     // you decided: single image only
-    product.images = [imagePath];
+    product.images = [result.secure_url];
     await product.save();
 
     res.json({
@@ -477,7 +477,7 @@ export const getAllProductsAdmin = async (req, res) => {
 
     const mapped = products.map(p => {
       const obj = p.toObject();
-    
+
       return {
         ...obj,
         images: Array.isArray(obj.images)
@@ -540,41 +540,40 @@ export const deleteProduct = async (req, res) => {
 
 
 
-  
-  
-  export const createUserByAdmin = async (req, res) => {
-    try {
-      const { name, email, phone, password, role, status, address, notes } = req.body;
-  
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password required" });
-      }
-  
-      const exists = await User.findOne({ email });
-      if (exists) {
-        return res.status(400).json({ message: "User already exists" });
-      }
-  
-      const hashedPassword = await bcrypt.hash(password, 10);
-  
-      const user = await User.create({
-        name,
-        email,
-        phone,
-        address,
-        notes,
-        password: hashedPassword,
-        role: role ? role.toLowerCase() : "user",
-        status: status ? status.toLowerCase() : "active",
-        isVerified: true,              // ✅ FIX
-        verifiedAt: new Date()         // ✅ optional but recommended
-      });
-  
-      res.json({ success: true, user });
-  
-    } catch (err) {
-      console.error("ADMIN CREATE USER ERROR:", err);
-      res.status(500).json({ message: "Failed to create user" });
+
+
+export const createUserByAdmin = async (req, res) => {
+  try {
+    const { name, email, phone, password, role, status, address, notes } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
     }
-  };
-  
+
+    const exists = await User.findOne({ email });
+    if (exists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      address,
+      notes,
+      password: hashedPassword,
+      role: role ? role.toLowerCase() : "user",
+      status: status ? status.toLowerCase() : "active",
+      isVerified: true,              // ✅ FIX
+      verifiedAt: new Date()         // ✅ optional but recommended
+    });
+
+    res.json({ success: true, user });
+
+  } catch (err) {
+    console.error("ADMIN CREATE USER ERROR:", err);
+    res.status(500).json({ message: "Failed to create user" });
+  }
+};
