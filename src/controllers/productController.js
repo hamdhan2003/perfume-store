@@ -11,52 +11,52 @@ const resolveImage = (img) => {
 };
 /* ================= GET PUBLIC PRODUCTS ================= */
 export const getPublicProducts = async (req, res) => {
-    try {
-      const limit = Number(req.query.limit) || 4;
-      const skip = Number(req.query.skip) || 0;
-      const quality = req.query.quality; // normal | original
-  
-      const query = {
-        active: true
+  try {
+    const limit = Number(req.query.limit) || 4;
+    const skip = Number(req.query.skip) || 0;
+    const quality = req.query.quality; // normal | original
+
+    const query = {
+      active: true
+    };
+
+    // ✅ QUALITY FILTER (SAFE)
+    // ✅ QUALITY FILTER (CASE-INSENSITIVE FIX)
+    if (quality && ["normal", "original"].includes(quality)) {
+      query.quality = {
+        $regex: new RegExp(`^${quality}$`, "i")
       };
-  
-      // ✅ QUALITY FILTER (SAFE)
-   // ✅ QUALITY FILTER (CASE-INSENSITIVE FIX)
-if (quality && ["normal", "original"].includes(quality)) {
-  query.quality = {
-    $regex: new RegExp(`^${quality}$`, "i")
-  };
-}
-
-      const [products, total] = await Promise.all([
-        Product.find(query)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-  
-        Product.countDocuments(query)
-      ]);
-      const normalizedProducts = products.map(p => ({
-        ...p.toObject(),
-        images: Array.isArray(p.images)
-          ? p.images.map(resolveImage)
-          : []
-      }));
-      
-      res.json({
-        success: true,
-        products: normalizedProducts,
-        total
-      });
-  
-    } catch (err) {
-      console.error("PUBLIC PRODUCTS ERROR:", err);
-      res.status(500).json({ message: "Failed to load products" });
     }
-  };
 
-  
-  /* ================= GET SINGLE PRODUCT (PUBLIC) ================= */
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+
+      Product.countDocuments(query)
+    ]);
+    const normalizedProducts = products.map(p => ({
+      ...p.toObject(),
+      images: Array.isArray(p.images)
+        ? p.images.map(resolveImage)
+        : []
+    }));
+
+    res.json({
+      success: true,
+      products: normalizedProducts,
+      total
+    });
+
+  } catch (err) {
+    console.error("PUBLIC PRODUCTS ERROR:", err);
+    res.status(500).json({ message: "Failed to load products" });
+  }
+};
+
+
+/* ================= GET SINGLE PRODUCT (PUBLIC) ================= */
 export const getPublicProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -245,14 +245,14 @@ export const submitProductReview = async (req, res) => {
 
     await product.save();
 
-   // 5️⃣ Update order queue state (FINAL FIX)
-queueItem.reviewed = true;
-queueItem.skipped = false;
-queueItem.reviewedAt = new Date();
-queueItem.rating = rating;
-queueItem.comment = comment || "";
+    // 5️⃣ Update order queue state (FINAL FIX)
+    queueItem.reviewed = true;
+    queueItem.skipped = false;
+    queueItem.reviewedAt = new Date();
+    queueItem.rating = rating;
+    queueItem.comment = comment || "";
 
-await order.save();
+    await order.save();
 
 
     return res.status(201).json({
@@ -478,11 +478,11 @@ export const getTopSoldProduct = async (req, res) => {
   try {
     const quality = req.query.quality;
 
-    const query = { 
+    const query = {
       active: true,
       soldCount: { $gt: 0 }   // 🔒 BLOCK UNSOLD PRODUCTS
     };
-        if (quality && ["normal", "original"].includes(quality)) {
+    if (quality && ["normal", "original"].includes(quality)) {
       query.quality = quality;
     }
 
@@ -492,7 +492,14 @@ export const getTopSoldProduct = async (req, res) => {
 
     res.json({
       success: true,
-      product: product || null
+      product: product
+        ? {
+          ...product,
+          images: Array.isArray(product.images)
+            ? product.images.map(resolveImage)
+            : []
+        }
+        : null
     });
 
   } catch (err) {

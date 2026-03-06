@@ -456,7 +456,7 @@ export const uploadProductImage = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     // you decided: single image only
-    product.images = [result.secure_url];
+    product.images = [imagePath];
     await product.save();
 
     res.json({

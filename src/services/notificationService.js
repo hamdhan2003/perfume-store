@@ -54,7 +54,6 @@ export async function notifyOrderEvent(event, order, actor) {
   if (event === "ORDER_PLACED") {
     const adminMsg = `New Order ${oid}\nCustomer: ${order.customer.name}\nPhone: ${order.customer.phone}\nPayment: ${order.paymentMethod} (${displayPaymentStatus})\nItems:\n${itemLines(order)}\nTotal: LKR ${order.total}`;
 
-    // In-app notifications
     await Notification.create({
       recipientType: "user",
       recipientId: order.user,
@@ -74,23 +73,18 @@ export async function notifyOrderEvent(event, order, actor) {
       expiresAt,
     });
 
-    // Admin email/whatsapp
     if (adminSettings.channels?.email && adminSettings.notificationEmail) {
-      await sendAdminEmail(
-        adminSettings.notificationEmail,
-        `New Order ${oid}`,
-        adminMsg
-      );
+      await sendAdminEmail(adminSettings.notificationEmail, `New Order ${oid}`, adminMsg);
     }
 
     if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
       await sendAdminWhatsApp(adminMsg);
     }
 
-    // Customer email – order confirmation
+    // Customer email – order placed confirmation
     const userEmail = await getOrderUserEmail(order);
     if (userEmail) {
-      await sendOrderEmail(userEmail, `Order Confirmed – ${oid}`, {
+      await sendOrderEmail(userEmail, `Order Placed – ${oid}`, {
         orderId: order._id.toString(),
         orderShortId: oid,
         items: order.items,
@@ -100,11 +94,11 @@ export async function notifyOrderEvent(event, order, actor) {
       });
     }
 
-    // Customer SMS
+    // Customer SMS — DISABLED (sendUserSMS has early return)
     if (order.customer?.phone) {
       await sendUserSMS(
         order.customer.phone,
-        `Hi ${order.customer.name.split(" ")[0]}, your order ${oid} has been placed successfully. Total: LKR ${order.total}. Track at: ${trackingLink}`
+        `Hi ${order.customer.name.split(" ")[0]}, your order ${oid} has been placed. Total: LKR ${order.total}. Track at: ${trackingLink}`
       );
     }
   }
@@ -121,19 +115,10 @@ export async function notifyOrderEvent(event, order, actor) {
       expiresAt,
     });
 
-    // Admin email
-    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
-      await sendAdminEmail(
-        adminSettings.notificationEmail,
-        `Order Confirmed – ${oid}`,
-        `Order ${oid} has been confirmed.\nCustomer: ${order.customer.name}`
-      );
-    }
-
     // Customer email
     const userEmail = await getOrderUserEmail(order);
     if (userEmail) {
-      await sendOrderEmail(userEmail, `Order Confirmed – ${oid}`, {
+      await sendOrderEmail(userEmail, `Your Order is Confirmed – ${oid}`, {
         orderId: order._id.toString(),
         orderShortId: oid,
         items: order.items,
@@ -141,6 +126,15 @@ export async function notifyOrderEvent(event, order, actor) {
         status: "confirmed",
         trackingLink,
       });
+    }
+
+    // Admin notification
+    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
+      await sendAdminEmail(
+        adminSettings.notificationEmail,
+        `Order Confirmed – ${oid}`,
+        `Order ${oid} for ${order.customer.name} has been confirmed.`
+      );
     }
   }
 
@@ -169,15 +163,14 @@ export async function notifyOrderEvent(event, order, actor) {
       });
     }
 
-    // Customer SMS
+    // Customer SMS — DISABLED
     if (order.customer?.phone) {
       await sendUserSMS(
         order.customer.phone,
-        `Your order ${oid} has been shipped! Track your order at: ${trackingLink}`
+        `Your order ${oid} has been shipped! Track at: ${trackingLink}`
       );
     }
 
-    // Admin whatsapp (optional)
     if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
       await sendAdminWhatsApp(`Order ${oid} has been shipped.`);
     }
@@ -186,7 +179,6 @@ export async function notifyOrderEvent(event, order, actor) {
   // ─────────────────────────────────────────────────────────────────────────
   if (event === "ORDER_DELIVERED") {
     if (actor === "user" || actor === "admin") {
-      // User in-app notification
       await Notification.create({
         recipientType: "user",
         recipientId: order.user,
@@ -209,13 +201,8 @@ export async function notifyOrderEvent(event, order, actor) {
         expiresAt,
       });
 
-      // Admin email/whatsapp
       if (adminSettings.channels?.email && adminSettings.notificationEmail) {
-        await sendAdminEmail(
-          adminSettings.notificationEmail,
-          `Order ${actorLabel}`,
-          adminMsg
-        );
+        await sendAdminEmail(adminSettings.notificationEmail, `Order ${actorLabel}`, adminMsg);
       }
 
       if (adminSettings.channels?.whatsapp && adminSettings.whatsappNumber) {
@@ -235,7 +222,7 @@ export async function notifyOrderEvent(event, order, actor) {
         });
       }
 
-      // Customer SMS
+      // Customer SMS — DISABLED
       if (order.customer?.phone) {
         await sendUserSMS(
           order.customer.phone,
@@ -278,17 +265,27 @@ export async function notifyOrderEvent(event, order, actor) {
       }
     } else {
       // Admin cancelled → notify user
-      const fullUser =
-        order.user && typeof order.user === "object" && order.user.email
-          ? order.user
-          : await User.findById(order.user).lean();
+      const userEmail = await getOrderUserEmail(order);
 
-      if (fullUser?.email) {
-        await sendAdminEmail(
-          fullUser.email,
-          `Your order ${oid} has been cancelled`,
-          `Dear ${order.customer.name},\n\nYour order ${oid} has been cancelled by admin.\n\nIf you have any questions, please contact us.\n\nHirah Attar`
-        );
+      await Notification.create({
+        recipientType: "user",
+        recipientId: order.user,
+        event,
+        title: "Order Cancelled",
+        message: `Your order ${oid} has been cancelled by our team. Contact us if you have questions.`,
+        orderId: order._id,
+        expiresAt,
+      });
+
+      if (userEmail) {
+        await sendOrderEmail(userEmail, `Your Order Has Been Cancelled – ${oid}`, {
+          orderId: order._id.toString(),
+          orderShortId: oid,
+          items: order.items,
+          total: order.total,
+          status: "cancelled",
+          trackingLink: null,
+        });
       }
     }
   }
@@ -305,30 +302,10 @@ export async function notifyOrderEvent(event, order, actor) {
       expiresAt,
     });
 
-    const returnMsg = `Order Returned\nOrder: ${oid}\nCustomer: ${order.customer.name}`;
-
-    await Notification.create({
-      recipientType: "admin",
-      event,
-      title: "Order Returned",
-      message: returnMsg,
-      orderId: order._id,
-      expiresAt,
-    });
-
-    // Admin email
-    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
-      await sendAdminEmail(
-        adminSettings.notificationEmail,
-        `Order Returned – ${oid}`,
-        returnMsg
-      );
-    }
-
     // Customer email
     const userEmail = await getOrderUserEmail(order);
     if (userEmail) {
-      await sendOrderEmail(userEmail, `Order Returned – ${oid}`, {
+      await sendOrderEmail(userEmail, `Order Return Processed – ${oid}`, {
         orderId: order._id.toString(),
         orderShortId: oid,
         items: order.items,
@@ -336,6 +313,21 @@ export async function notifyOrderEvent(event, order, actor) {
         status: "returned",
         trackingLink: null,
       });
+    }
+
+    // Admin notification
+    const adminMsg = `Order Returned\nOrder: ${oid}\nCustomer: ${order.customer.name}`;
+    await Notification.create({
+      recipientType: "admin",
+      event,
+      title: "Order Returned",
+      message: adminMsg,
+      orderId: order._id,
+      expiresAt,
+    });
+
+    if (adminSettings.channels?.email && adminSettings.notificationEmail) {
+      await sendAdminEmail(adminSettings.notificationEmail, `Order Returned – ${oid}`, adminMsg);
     }
   }
 }

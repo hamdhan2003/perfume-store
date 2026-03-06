@@ -547,8 +547,19 @@ export const getOrderByIdUser = async (req, res) => {
         Array.isArray(item.productId.images) &&
         item.productId.images.length > 0
       ) {
-        // Images are stored as full Cloudinary URLs — use as-is
         image = item.productId.images[0];
+
+        // 🔥 ABSOLUTE URL (FINAL FIX)
+        if (!image.startsWith("http")) {
+          // always return RELATIVE path (same as cart flow)
+          if (image.startsWith("http")) {
+            image = image.replace(/^https?:\/\/[^/]+\/?/i, "");
+          }
+
+          if (image.startsWith("/")) {
+            image = image.slice(1);
+          }
+        }
       }
 
       return {
